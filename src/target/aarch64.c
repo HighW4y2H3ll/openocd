@@ -2473,6 +2473,47 @@ static int aarch64_virt2phys(struct target *target, target_addr_t virt,
 	return armv8_mmu_translate_va_pa(target, virt, phys, 1);
 }
 
+static int aarch64_read_buffer_by_phys(struct target *target,
+        target_addr_t address, uint32_t count, uint8_t *buffer) {
+	uint32_t size;
+
+	/* Align up to maximum 4 bytes. The loop condition makes sure the next pass
+	 * will have something to do with the size we leave to it. */
+	for (size = 1; size < 4 && count >= size * 2 + (address & size); size *= 2) {
+		if (address & size) {
+            if (!target_was_examined(target)) {
+                LOG_ERROR("Target not examined yet");
+                return ERROR_FAIL;
+            }
+			int retval = target->type->read_phys_memory(target, address, size, 1, buffer);
+			if (retval != ERROR_OK)
+				return retval;
+			address += size;
+			count -= size;
+			buffer += size;
+		}
+	}
+
+	/* Read the data with as large access size as possible. */
+	for (; size > 0; size /= 2) {
+		uint32_t aligned = count - count % size;
+		if (aligned > 0) {
+            if (!target_was_examined(target)) {
+                LOG_ERROR("Target not examined yet");
+                return ERROR_FAIL;
+            }
+			int retval = target->type->read_phys_memory(target, address, size, aligned / size, buffer);
+			if (retval != ERROR_OK)
+				return retval;
+			address += aligned;
+			count -= aligned;
+			buffer += aligned;
+		}
+	}
+
+	return ERROR_OK;
+}
+
 /*
  * private target configuration items
  */
@@ -2897,4 +2938,7 @@ struct target_type aarch64_target = {
 	.write_phys_memory = aarch64_write_phys_memory,
 	.mmu = aarch64_mmu,
 	.virt2phys = aarch64_virt2phys,
+
+    // dump mem by physical addr
+    .read_buffer = aarch64_read_buffer_by_phys,
 };
