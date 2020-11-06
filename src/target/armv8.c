@@ -1491,6 +1491,46 @@ static const struct {
 	{ ARMV8_V15, 0, "d30", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
 	{ ARMV8_V15, 8, "d31", 64, ARM_MODE_ANY, REG_TYPE_IEEE_DOUBLE, NULL, "org.gnu.gdb.arm.vfp"},
 	{ ARMV8_FPSR, 0, "fpscr", 32, ARM_MODE_ANY, REG_TYPE_UINT32, "float", "org.gnu.gdb.arm.vfp"},
+
+    /* banked registers in compatible with armv7 (cortex A53) */
+	{ ARMV8_R8, 0, "r8_fiq", 32, ARM_MODE_FIQ, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R9, 0, "r9_fiq", 32, ARM_MODE_FIQ, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R10, 0, "r10_fiq", 32, ARM_MODE_FIQ, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R11, 0, "r11_fiq", 32, ARM_MODE_FIQ, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R12, 0, "r12_fiq", 32, ARM_MODE_FIQ, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+
+	{ ARMV8_R13, 0, "sp_fiq", 32, ARM_MODE_FIQ, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R14, 0, "lr_fiq", 32, ARM_MODE_FIQ, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.core" },
+
+	{ ARMV8_R13, 0, "sp_irq", 32, ARM_MODE_IRQ, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R14, 0, "lr_irq", 32, ARM_MODE_IRQ, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.core" },
+
+	{ ARMV8_R13, 0, "sp_svc", 32, ARM_MODE_SVC, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R14, 0, "lr_svc", 32, ARM_MODE_SVC, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.core" },
+
+	{ ARMV8_R13, 0, "sp_abt", 32, ARM_MODE_ABT, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R14, 0, "lr_abt", 32, ARM_MODE_ABT, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.core" },
+
+	{ ARMV8_R13, 0, "sp_und", 32, ARM_MODE_UND, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R14, 0, "lr_und", 32, ARM_MODE_UND, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.core" },
+
+	{ ARMV8_R13, 0, "sp_usr", 32, ARM_MODE_USR, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R14, 0, "lr_usr", 32, ARM_MODE_USR, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.core" },
+
+	{ ARMV8_xPSR, 0, "spsr_fiq", 32, ARM_MODE_FIQ, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_xPSR, 0, "spsr_irq", 32, ARM_MODE_IRQ, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_xPSR, 0, "spsr_svc", 32, ARM_MODE_SVC, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_xPSR, 0, "spsr_abt", 32, ARM_MODE_ABT, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_xPSR, 0, "spsr_und", 32, ARM_MODE_UND, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+
+    /* TrustZone */
+	{ ARMV8_R13, 0, "sp_mon", 32, ARM_MODE_MON, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_R14, 0, "lr_mon", 32, ARM_MODE_MON, REG_TYPE_CODE_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_xPSR, 0, "spsr_mon", 32, ARM_MODE_MON, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
+
+    /* Virtualization */
+	{ ARMV8_R13, 0, "sp_hyp", 32, ARM_MODE_HYP, REG_TYPE_DATA_PTR, "general", "org.gnu.gdb.arm.core" },
+	{ ARMV8_xPSR, 0, "spsr_hyp", 32, ARM_MODE_HYP, REG_TYPE_UINT32, "general", "org.gnu.gdb.arm.core" },
 };
 
 #define ARMV8_NUM_REGS ARRAY_SIZE(armv8_regs)
@@ -1548,23 +1588,12 @@ static int armv8_get_core_reg32(struct reg *reg)
 	struct arm_reg *armv8_reg = reg->arch_info;
 	struct target *target = armv8_reg->target;
 	struct arm *arm = target_to_arm(target);
-	struct reg_cache *cache = arm->core_cache;
-	struct reg *reg64;
 	int retval;
 
 	if (target->state != TARGET_HALTED)
 		return ERROR_TARGET_NOT_HALTED;
 
-	/* get the corresponding Aarch64 register */
-	reg64 = cache->reg_list + armv8_reg->num;
-	if (reg64->valid) {
-		reg->valid = true;
-		return ERROR_OK;
-	}
-
-	retval = arm->read_core_reg(target, reg64, armv8_reg->num, arm->core_mode);
-	if (retval == ERROR_OK)
-		reg->valid = reg64->valid;
+	retval = arm->read_core_reg(target, reg, armv8_reg->num, armv8_reg->mode);
 
 	return retval;
 }
@@ -1617,6 +1646,7 @@ struct reg_cache *armv8_build_reg_cache(struct target *target)
 	struct reg *reg_list = calloc(num_regs, sizeof(struct reg));
 	struct reg *reg_list32 = calloc(num_regs32, sizeof(struct reg));
 	struct arm_reg *arch_info = calloc(num_regs, sizeof(struct arm_reg));
+	struct arm_reg *arch_info32 = calloc(num_regs32, sizeof(struct arm_reg));
 	struct reg_feature *feature;
 	int i;
 
@@ -1671,11 +1701,16 @@ struct reg_cache *armv8_build_reg_cache(struct target *target)
 	cache32->num_regs = num_regs32;
 
 	for (i = 0; i < num_regs32; i++) {
+		arch_info32[i].num = armv8_regs32[i].id;
+		arch_info32[i].mode = armv8_regs32[i].mode;
+		arch_info32[i].target = target;
+		arch_info32[i].arm = arm;
+
 		reg_list32[i].name = armv8_regs32[i].name;
 		reg_list32[i].size = armv8_regs32[i].bits;
-		reg_list32[i].value = &arch_info[armv8_regs32[i].id].value[armv8_regs32[i].mapping];
+		reg_list32[i].value = &arch_info32[i].value[0];
 		reg_list32[i].type = &armv8_reg32_type;
-		reg_list32[i].arch_info = &arch_info[armv8_regs32[i].id];
+		reg_list32[i].arch_info = &arch_info32[i];
 		reg_list32[i].group = armv8_regs32[i].group;
 		reg_list32[i].number = i;
 		reg_list32[i].exist = true;

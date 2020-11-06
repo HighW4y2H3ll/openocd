@@ -983,9 +983,18 @@ static int armv8_dpm_read_core_reg(struct target *target, struct reg *r,
 	if (retval != ERROR_OK)
 		return retval;
 
+    if (mode != ARM_MODE_ANY) {
+        retval = armv8_dpm_modeswitch(dpm, mode);
+        if (retval != ERROR_OK)
+            goto fail;
+    }
+
 	retval = dpmv8_read_reg(dpm, r, regnum);
 	if (retval != ERROR_OK)
 		goto fail;
+
+    if (mode != ARM_MODE_ANY)
+        (void) armv8_dpm_modeswitch(dpm, ARM_MODE_ANY);
 
 fail:
 	/* (void) */ dpm->finish(dpm);
